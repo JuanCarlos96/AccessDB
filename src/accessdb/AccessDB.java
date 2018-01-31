@@ -4,6 +4,7 @@ import com.healthmarketscience.jackcess.*;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.Scanner;
 
 public class AccessDB {
@@ -133,7 +134,7 @@ public class AccessDB {
             
             System.out.println(id.getName()+"\t"+nombre.getName());
             System.out.println("-----------------------------");
-            IndexCursor cursor = CursorBuilder.createCursor(departamento.getPrimaryKeyIndex());
+            IndexCursor cursor = CursorBuilder.createCursor(departamento.getPrimaryKeyIndex());//A los cursores hay que indicarles un índice para mostrar los datos en un orden, es como un ORDER BY
             for(Row row:cursor){
                 System.out.println(String.format("%d\t%s", row.get("ID"), row.get("Nombre")));
             }
@@ -155,7 +156,7 @@ public class AccessDB {
             Column salario = empleado.getColumn("Salario");
             Column iddep = empleado.getColumn("IdDep");
             
-            System.out.println(id.getName()+"\t"+nombre.getName()+"\t"+puesto.getName()+"\t"+salario.getName()+"\t"+iddep.getName());
+            System.out.println(id.getName()+"\t"+nombre.getName()+"\t"+puesto.getName()+"\t"+salario.getName()+"\t\t"+iddep.getName());
             System.out.println("-----------------------------------------------------------");
             IndexCursor cursor = CursorBuilder.createCursor(empleado.getPrimaryKeyIndex());
             for(Row row:cursor){
@@ -169,7 +170,7 @@ public class AccessDB {
     
     /**
      * Actualiza un departamento existente
-     * @param id El departamento que se va a actualizar
+     * @param id El ID del departamento que se va a actualizar
      * @param nombre El nuevo nombre del departamento
      */
     private void actualizarDepartamento(int id, String nombre){
@@ -189,24 +190,97 @@ public class AccessDB {
         }
     }
     
+    /**
+     * Actualiza un empleado existente
+     * @param id El id del empleado que se va a actualizar
+     * @param nombre El nuevo nombre del empleado
+     * @param puesto El nuevo puesto del empleado
+     * @param salario El nuevo salario del empleado
+     * @param iddep El nuevo ID del departamento al que pertenece
+     */
     private void actualizarEmpleado(int id, String nombre, String puesto, BigDecimal salario, int iddep){
         try {
-            
+            Table empleado = db.getTable("Empleado");
+            Row row = CursorBuilder.findRowByPrimaryKey(empleado, id);
+            if(row!=null){
+                row.put("Nombre", nombre);
+                row.put("Puesto", puesto);
+                row.put("Salario", salario);
+                row.put("IdDep", iddep);
+                empleado.updateRow(row);
+                System.out.println("Empleado modificado correctamente");
+            }else{
+                System.out.println("No se ha encontrado un empleado con ese ID");
+            }
         } catch (Exception e) {
+            System.out.println("Error modificando el empleado");
+            e.printStackTrace();
         }
     }
     
     /**
-     * Reinicia la base de datos
+     * Elimina un departamento
+     * @param id El ID del departamento que se va a eliminar
      */
-//    private void reiniciarBD(){
-//        cerrarConexion();
-//        File dbFile = new File(db.getFile().getName());
-//        if(dbFile.exists()){
-//            if(dbFile.delete())
-//                System.out.println("Base de datos borrada");
-//        }
-//    }
+    private void eliminarDepartamento(int id){
+        try {
+            Table departamento = db.getTable("Departamento");
+            Row row = CursorBuilder.findRowByPrimaryKey(departamento, id);
+            if(row!=null){
+                departamento.deleteRow(row);
+                System.out.println("Departamento eliminado correctamente");
+            }else{
+                System.out.println("No se ha encontrado un departamento con ese ID");
+            }
+        } catch (IOException e) {
+            System.out.println("Error eliminando el departamento");
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Elimina un empleado
+     * @param id El ID del empleado que se va a eliminar
+     */
+    private void eliminarEmpleado(int id){
+        try {
+            Table empleado = db.getTable("Empleado");
+            Row row = CursorBuilder.findRowByPrimaryKey(empleado, id);
+            if(row!=null){
+                empleado.deleteRow(row);
+                System.out.println("Empleado eliminado correctamente");
+            }else{
+                System.out.println("No se ha encontrado un empleado con ese ID");
+            }
+        } catch (IOException e) {
+            System.out.println("Error eliminando el empleado");
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Lista a los empleados junto con el departamento al que pertenecen
+     */
+    private void listarEmpleadoDepartamento(){
+        try {
+            Table departamento = db.getTable("Departamento");
+            Table empleado = db.getTable("Empleado");
+            
+            System.out.println("Empleado\tDepartamento");
+            System.out.println("------------------------------");
+            IndexCursor cursor = CursorBuilder.createCursor(empleado.getPrimaryKeyIndex());
+            Cursor cursor2 = CursorBuilder.createCursor(departamento);
+            for(Row row:cursor){
+                Short iddep = (Short) row.get("IdDep");
+                cursor2.findFirstRow(Collections.singletonMap("ID", iddep));
+                String nombredep = (String) cursor2.getCurrentRowValue(departamento.getColumn("Nombre"));
+                System.out.println(String.format("%s\t\t"+nombredep, row.get("Nombre")));
+            }
+        } catch (IOException e) {
+            System.out.println("Error leyendo las dos tablas");
+            e.printStackTrace();
+        }
+    }
     
     /**
      * Cierra la conexión de la base de datos.
@@ -225,14 +299,18 @@ public class AccessDB {
         Scanner teclado = new Scanner(System.in);
         int opcion;
         
-        do {            
+        do {
             System.out.println("\n\n1. Introducir un nuevo departamento");
             System.out.println("2. Modificar un departamento existente");
-            System.out.println("3. Visualizar contenido de la tabla 'Departamento'");
-            System.out.println("4. Introducir un nuevo empleado");
-            System.out.println("5. Visualizar contenido de la tabla 'Empleado'");
-            System.out.println("6. Salir");
-            System.out.print("Introduzca una opción:");
+            System.out.println("3. Eliminar un departamento existente");
+            System.out.println("4. Visualizar contenido de la tabla 'Departamento'");
+            System.out.println("5. Introducir un nuevo empleado");
+            System.out.println("6. Modificar un empleado existente");
+            System.out.println("7. Eliminar un empleado existente");
+            System.out.println("8. Visualizar contenido de la tabla 'Empleado'");
+            System.out.println("9. Visualizar empleados y su departamento");
+            System.out.println("10. Salir");
+            System.out.print("Introduzca una opción: ");
             opcion = Integer.parseInt(teclado.nextLine());
             
             switch(opcion){
@@ -240,9 +318,9 @@ public class AccessDB {
                     int iddep;
                     String nombredep;
                     
-                    System.out.print("Introduzca ID del departamento:");
+                    System.out.print("Introduzca ID del departamento: ");
                     iddep = Integer.parseInt(teclado.nextLine());
-                    System.out.print("Introduzca nombre del departamento:");
+                    System.out.print("Introduzca nombre del departamento: ");
                     nombredep = teclado.nextLine();
                     
                     access.insertarDepartamento(iddep, nombredep);
@@ -251,7 +329,7 @@ public class AccessDB {
                     int i;
                     String nombrenuevo;
                     
-                    System.out.print("Introduzca ID del departamento a modificar:");
+                    System.out.print("Introduzca ID del departamento a modificar: ");
                     i = Integer.parseInt(teclado.nextLine());
                     System.out.print("Introduzca el nuevo nombre del departamento:");
                     nombrenuevo = teclado.nextLine();
@@ -259,34 +337,70 @@ public class AccessDB {
                     access.actualizarDepartamento(i, nombrenuevo);
                     break;
                 case 3:
-                    access.listarDepartamentos();
+                    int iddepb;
+                    
+                    System.out.print("Introduzca ID del departamento a eliminar: ");
+                    iddepb = Integer.parseInt(teclado.nextLine());
+                    
+                    access.eliminarDepartamento(iddepb);
                     break;
                 case 4:
+                    access.listarDepartamentos();
+                    break;
+                case 5:
                     int idemp,iddep2;
                     String nombreemp, puestoemp;
                     BigDecimal salarioemp;
                     
-                    System.out.print("Introduzca ID del empleado:");
+                    System.out.print("Introduzca ID del empleado: ");
                     idemp = Integer.parseInt(teclado.nextLine());
-                    System.out.print("Introduzca nombre del empleado:");
+                    System.out.print("Introduzca nombre del empleado: ");
                     nombreemp = teclado.nextLine();
-                    System.out.print("Introduzca puesto del empleado:");
+                    System.out.print("Introduzca puesto del empleado: ");
                     puestoemp = teclado.nextLine();
-                    System.out.print("Introduzca salario del empleado:");
+                    System.out.print("Introduzca salario del empleado: ");
                     salarioemp = BigDecimal.valueOf(Double.parseDouble(teclado.nextLine()));
-                    System.out.print("Introduzca ID del departamento al que pertenece:");
+                    System.out.print("Introduzca ID del departamento al que pertenece: ");
                     iddep2 = Integer.parseInt(teclado.nextLine());
                     
                     access.insertaEmpleado(idemp, nombreemp, puestoemp, salarioemp, iddep2);
                     break;
-                case 5:
+                case 6:
+                    int idemp2,iddep3;
+                    String nombreemp2, puestoemp2;
+                    BigDecimal salarioemp2;
+                    
+                    System.out.print("Introduzca del ID del empleado a modificar: ");
+                    idemp2 = Integer.parseInt(teclado.nextLine());
+                    System.out.print("Introduzca nuevo nombre del empleado: ");
+                    nombreemp2 = teclado.nextLine();
+                    System.out.print("Introduzca nuevo puesto del empleado: ");
+                    puestoemp2 = teclado.nextLine();
+                    System.out.print("Introduzca nuevo salario del empleado: ");
+                    salarioemp2 = BigDecimal.valueOf(Double.parseDouble(teclado.nextLine()));
+                    System.out.print("Introduzca nuevo ID del departamento al que pertenece: ");
+                    iddep3 = Integer.parseInt(teclado.nextLine());
+                    
+                    access.actualizarEmpleado(idemp2, nombreemp2, puestoemp2, salarioemp2, iddep3);
+                    break;
+                case 7:
+                    int idempb;
+                    
+                    System.out.print("Introduzca ID del empleado a eliminar: ");
+                    idempb = Integer.parseInt(teclado.nextLine());
+                    
+                    access.eliminarEmpleado(idempb);
+                    break;
+                case 8:
                     access.listarEmpleados();
                     break;
+                case 9:
+                    access.listarEmpleadoDepartamento();
+                    break;
                 default:
-                    System.out.println("Adios");
+                    access.cerrarConexion();
                     break;
             }
-        } while (opcion<6);
-        access.cerrarConexion();
+        } while (opcion<10);
     }
 }
